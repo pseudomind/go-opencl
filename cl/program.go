@@ -107,7 +107,7 @@ func (p *Program) NewKernelNamed(name string) (*Kernel, error) {
 		return nil, Cl_error(err)
 	}
 
-	kernel := &Kernel{id: c_kernel}
+	kernel := &Kernel{id: c_kernel, properties: make(map[KernelProperty]interface{}), workgroupproperties: make(map[KernelWorkGroupProperty]interface{})}
 	runtime.SetFinalizer(kernel, (*Kernel).release)
 
 	return kernel, nil
