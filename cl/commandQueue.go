@@ -51,6 +51,20 @@ type CommandQueue struct {
 	id C.cl_command_queue
 }
 
+func (cq *CommandQueue) Flush() error {
+	if ret := C.clFlush(cq.id); ret != C.CL_SUCCESS {
+		return Cl_error(ret)
+	}
+	return nil
+}
+
+func (cq *CommandQueue) Finish() error {
+	if ret := C.clFinish(cq.id); ret != C.CL_SUCCESS {
+		return Cl_error(ret)
+	}
+	return nil
+}
+
 func (cq *CommandQueue) EnqueueKernel(k *Kernel, offset, gsize, lsize []Size) error {
 
 	cptr := func(w []Size) *C.size_t {

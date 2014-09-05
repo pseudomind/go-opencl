@@ -38,8 +38,138 @@ import (
 	"unsafe"
 )
 
+type KernelProperty C.cl_kernel_info
+
+const (
+	KERNEL_FUNCTION_NAME   KernelProperty = C.CL_KERNEL_FUNCTION_NAME
+	KERNEL_NUM_ARGS        KernelProperty = C.CL_KERNEL_NUM_ARGS
+	KERNEL_REFERENCE_COUNT KernelProperty = C.CL_KERNEL_REFERENCE_COUNT
+	KERNEL_CONTEXT         KernelProperty = C.CL_KERNEL_CONTEXT
+	KERNEL_PROGRAM         KernelProperty = C.CL_KERNEL_PROGRAM
+	// new in 1.2
+	// KERNEL_ATTRIBUTES      KernelProperty = C.CL_KERNEL_ATTRIBUTES
+)
+
+func (k *Kernel) Property(prop KernelProperty) interface{} {
+	if value, ok := k.properties[prop]; ok {
+		return value
+	}
+
+	var data interface{}
+	var length C.size_t
+	var ret C.cl_int
+
+	switch prop {
+	case
+		KERNEL_FUNCTION_NAME:
+		if ret = C.clGetKernelInfo(k.id, C.cl_kernel_info(prop), 0, nil, &length); ret != C.CL_SUCCESS || length < 1 {
+			data = ""
+			break
+		}
+
+		buf := make([]C.char, length)
+		if ret = C.clGetKernelInfo(k.id, C.cl_kernel_info(prop), length, unsafe.Pointer(&buf[0]), &length); ret != C.CL_SUCCESS || length < 1 {
+			data = ""
+			break
+		}
+		data = C.GoStringN(&buf[0], C.int(length-1))
+
+	case
+		KERNEL_NUM_ARGS,
+		KERNEL_REFERENCE_COUNT:
+		var val C.cl_uint
+		ret = C.clGetKernelInfo(k.id, C.cl_kernel_info(prop), C.size_t(unsafe.Sizeof(val)), unsafe.Pointer(&val), &length)
+		data = val
+
+	case
+		KERNEL_CONTEXT:
+		var val C.cl_context
+		ret = C.clGetKernelInfo(k.id, C.cl_kernel_info(prop), C.size_t(unsafe.Sizeof(val)), unsafe.Pointer(&val), &length)
+		data = val
+
+	case
+		KERNEL_PROGRAM:
+		var val C.cl_program
+		ret = C.clGetKernelInfo(k.id, C.cl_kernel_info(prop), C.size_t(unsafe.Sizeof(val)), unsafe.Pointer(&val), &length)
+		data = val
+
+	// new in 1.2
+	// case
+	// 	KERNEL_ATTRIBUTES:
+	// 	if ret = C.clGetKernelInfo(k.id, C.cl_kernel_info(prop), 0, nil, &length); ret != C.CL_SUCCESS || length < 1 {
+	// 		data = ""
+	// 		break
+	// 	}
+
+	// 	buf := make([]C.char, length)
+	// 	if ret = C.clGetKernelInfo(k.id, C.cl_kernel_info(prop), length, unsafe.Pointer(&buf[0]), &length); ret != C.CL_SUCCESS || length < 1 {
+	// 		data = ""
+	// 		break
+	// 	}
+	// 	data = C.GoStringN(&buf[0], C.int(length-1))
+
+	default:
+		return nil
+	}
+
+	if ret != C.CL_SUCCESS {
+		return nil
+	}
+	k.properties[prop] = data
+	return k.properties[prop]
+}
+
+type KernelWorkGroupProperty C.cl_kernel_work_group_info
+
+const (
+	KERNEL_WORK_GROUP_SIZE             KernelWorkGroupProperty = C.CL_KERNEL_WORK_GROUP_SIZE
+	COMPILE_WORK_GROUP_SIZE            KernelWorkGroupProperty = C.CL_KERNEL_COMPILE_WORK_GROUP_SIZE
+	LOCAL_MEM_SIZE                     KernelWorkGroupProperty = C.CL_KERNEL_LOCAL_MEM_SIZE
+	PREFERRED_WORK_GROUP_SIZE_MULTIPLE KernelWorkGroupProperty = C.CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE
+	PRIVATE_MEM_SIZE                   KernelWorkGroupProperty = C.CL_KERNEL_PRIVATE_MEM_SIZE
+)
+
+func (k *Kernel) WorkGroupProperty(d Device, prop KernelWorkGroupProperty) interface{} {
+	if value, ok := k.workgroupproperties[prop]; ok {
+		return value
+	}
+
+	var data interface{}
+	var length C.size_t
+	var ret C.cl_int
+
+	switch prop {
+	case KERNEL_WORK_GROUP_SIZE,
+		PREFERRED_WORK_GROUP_SIZE_MULTIPLE:
+		var val C.size_t
+		ret = C.clGetKernelWorkGroupInfo(k.id, d.id, C.cl_kernel_work_group_info(prop), C.size_t(unsafe.Sizeof(val)), unsafe.Pointer(&val), &length)
+		data = val
+
+	case COMPILE_WORK_GROUP_SIZE:
+		// size_t[3]
+		break
+
+	case LOCAL_MEM_SIZE,
+		PRIVATE_MEM_SIZE:
+		var val C.cl_ulong
+		ret = C.clGetKernelWorkGroupInfo(k.id, d.id, C.cl_kernel_work_group_info(prop), C.size_t(unsafe.Sizeof(val)), unsafe.Pointer(&val), &length)
+		data = val
+
+	default:
+		return nil
+	}
+
+	if ret != C.CL_SUCCESS {
+		return nil
+	}
+	k.workgroupproperties[prop] = data
+	return k.workgroupproperties[prop]
+}
+
 type Kernel struct {
-	id C.cl_kernel
+	id                  C.cl_kernel
+	properties          map[KernelProperty]interface{}
+	workgroupproperties map[KernelWorkGroupProperty]interface{}
 }
 
 func (k *Kernel) SetArg(index uint, arg interface{}) error {
@@ -52,6 +182,9 @@ func (k *Kernel) SetArg(index uint, arg interface{}) error {
 		ret = C.clSetKernelArg(k.id, C.cl_uint(index), C.size_t(unsafe.Sizeof(t.id)), unsafe.Pointer(&t.id))
 	case *Sampler:
 		ret = C.clSetKernelArg(k.id, C.cl_uint(index), C.size_t(unsafe.Sizeof(t.id)), unsafe.Pointer(&t.id))
+	case int32:
+		f := C.int(t)
+		ret = C.clSetKernelArg(k.id, C.cl_uint(index), C.size_t(unsafe.Sizeof(f)), unsafe.Pointer(&f))
 	case float32:
 		f := C.float(t)
 		ret = C.clSetKernelArg(k.id, C.cl_uint(index), C.size_t(unsafe.Sizeof(f)), unsafe.Pointer(&f))

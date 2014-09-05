@@ -20,16 +20,17 @@
 package cl
 
 import (
-	"github.com/pseudomind/go-opencl/raw"
 	"testing"
+
+	"github.com/pseudomind/go-opencl/raw"
 )
 
 func Test_VectAdd(t *testing.T) {
 	const elements = 100000
 
-	A := make([]int, elements)
-	B := make([]int, elements)
-	for i := 0; i < elements; i++ {
+	A := make([]int32, elements)
+	B := make([]int32, elements)
+	for i := int32(0); i < elements; i++ {
 		A[i], B[i] = i, i
 	}
 	bytes := uint32(len(raw.ByteSlice(A)))
@@ -92,9 +93,9 @@ func Test_VectAdd(t *testing.T) {
 			if outBuf, err := queue.EnqueueReadBuffer(bufC, 0, bytes); err != nil {
 				t.Fatal(err)
 			} else {
-				C := raw.IntSlice(outBuf)
+				C := raw.Int32Slice(outBuf)
 
-				for i := 0; i < elements; i++ {
+				for i := int32(0); i < elements; i++ {
 					if C[i] != i<<1 {
 						t.Fatal("Output is incorrect")
 					}

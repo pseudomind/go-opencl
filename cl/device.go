@@ -260,6 +260,21 @@ func (d *Device) Property(prop DeviceProperty) interface{} {
 		}
 		data = C.GoStringN(&buf[0], C.int(length-1))
 
+	case DEVICE_MAX_WORK_ITEM_SIZES:
+		// default value is {1, 1, 1} as per spec
+		pprop := DEVICE_MAX_WORK_ITEM_DIMENSIONS
+		var pval C.cl_uint
+		if ret = C.clGetDeviceInfo(d.id, C.cl_device_info(pprop), C.size_t(unsafe.Sizeof(pval)), unsafe.Pointer(&pval), &length); ret != C.CL_SUCCESS || length < 1 {
+			data = []C.size_t{1, 1, 1}
+			break
+		}
+		buf := make([]C.size_t, pval)
+		if ret = C.clGetDeviceInfo(d.id, C.cl_device_info(prop), C.size_t(unsafe.Sizeof(buf)), unsafe.Pointer(&buf[0]), &length); ret != C.CL_SUCCESS || length < 1 {
+			data = []C.size_t{1, 1, 1}
+			break
+		}
+		data = buf
+
 	default:
 		return nil
 	}
